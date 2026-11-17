@@ -15,10 +15,10 @@ def spin_motor_forward_and_backwards():
     try:
         while time() < end_time:
             # direction switches immediately, no stop() in between
-            motor.forward(0.5)
+            motor.forward()
             print("forward")
             sleep(5)
-            motor.backward(0.5)
+            motor.backward()
             print("backwards")
             sleep(5)
     finally:
