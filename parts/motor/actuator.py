@@ -103,5 +103,27 @@ def forward_5s():
         motor.close()
 
 
+def soft_start_test():
+    """Compare a hard start with a soft start (ramped) start.
+
+    If the motor stops during the hard start but keeps running during the
+    soft start, the inrush current at start-up is tripping the supply/driver.
+    """
+    motor = DriverMotor()
+    try:
+        print("1) HARD start: full speed immediately, 5 s")
+        motor.forward(1.0)
+        sleep(5)
+        motor.brake()
+        print("   stopped, waiting 3 s")
+        sleep(3)
+
+        print("2) SOFT start: ramp to full speed over 2 s, then hold 5 s")
+        pulse(motor, 1.0, 5, ramp=2)
+        print("   done")
+    finally:
+        motor.close()
+
+
 if __name__ == "__main__":
-    forward_5s()
+    soft_start_test()
