@@ -7,7 +7,7 @@ FORWARD_PIN = 27
 BACKWARD_PIN = 22
 PWM_FREQUENCY = 30  # Hz, gpiozero default is 100 Hz
 MAX_SPEED = 0.8     # keyboard control ramps up to this duty cycle (80 %)
-RAMP_TIME = 2.0     # seconds to go from 0 to MAX_SPEED while a key is held
+RAMP_TIME = 1.0     # seconds to go from 0 to MAX_SPEED while a key is held
 HOLD_MIN_SPEED = 0.75  # after the first ramp, cycle HOLD_MIN_SPEED -> MAX_SPEED
 HOLD_CYCLE = 0.5       # seconds per 75 % -> 80 % cycle
 
