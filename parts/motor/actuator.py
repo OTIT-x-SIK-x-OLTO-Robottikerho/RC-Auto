@@ -5,12 +5,20 @@ from time import sleep, time
 ENABLE_PIN = 17
 FORWARD_PIN = 27
 BACKWARD_PIN = 22
+PWM_FREQUENCY = 1000  # Hz, gpiozero default is 100 Hz
+
+
+def make_motor() -> Motor:
+    motor = Motor(forward=FORWARD_PIN, backward=BACKWARD_PIN, enable=ENABLE_PIN)
+    motor.forward_device.frequency = PWM_FREQUENCY
+    motor.backward_device.frequency = PWM_FREQUENCY
+    return motor
 
 
 def spin_motor_forward_and_backwards():
     # The Pi drives the DRI0041's inputs; the driver powers the motor.
     # enable is held high, speed is set with PWM on the forward/backward pins.
-    motor: Motor = Motor(forward=FORWARD_PIN, backward=BACKWARD_PIN, enable=ENABLE_PIN)
+    motor: Motor = make_motor()
     end_time = time() + 4  # run for 4 seconds
     try:
         while time() < end_time:
@@ -28,7 +36,7 @@ def keyboard_control():
     q quits. Based on the gpiozero curses Robot example."""
     import curses
 
-    motor = Motor(forward=FORWARD_PIN, backward=BACKWARD_PIN, enable=ENABLE_PIN)
+    motor = make_motor()
 
     actions = {
         ord("w"): motor.forward, ord("W"): motor.forward,
