@@ -6,9 +6,11 @@ from time import sleep, time
 PWM_PIN = 12        # speed pulse = WiringPi 26 = physical pin 32 (PWM0)
 FORWARD_PIN = 27    # direction IN1 = physical pin 13
 BACKWARD_PIN = 22   # direction IN2 = physical pin 15
-PWM_FREQUENCY = 30  # Hz, gpiozero default is 100 Hz
-MAX_SPEED = 0.8     # keyboard control ramps up to this duty cycle (80 %)
-RAMP_TIME = 1.0     # seconds to go from 0 to MAX_SPEED while a key is held
+PWM_FREQUENCY = 100  # Hz, gpiozero default is 100 Hz
+MAX_SPEED = 1.0       # keyboard control ramps up to this duty cycle (100 %)
+RAMP_TIME = 0.5       # seconds to go from 0 to MAX_SPEED when a key is pressed
+HOLD_MIN_SPEED = 0.5  # while still held: reset to this and ramp to MAX_SPEED again
+HOLD_CYCLE = 0.25     # seconds per HOLD_MIN_SPEED -> MAX_SPEED ramp (same slope)
 
 
 class DriverMotor:
@@ -88,7 +90,8 @@ def keyboard_control():
 
     def main(window):
         window.addstr("Hold w = forward, hold s = backward, q = quit\n")
-        window.addstr(f"Speed ramps 0 -> {MAX_SPEED:.0%} over {RAMP_TIME} s while held\n")
+        window.addstr(f"Speed ramps 0 -> {MAX_SPEED:.0%} in {RAMP_TIME} s, "
+                      f"then cycles {HOLD_MIN_SPEED:.0%} -> {MAX_SPEED:.0%} while held\n")
         next_key = None
         while True:
             curses.halfdelay(1)
@@ -122,8 +125,15 @@ def keyboard_control():
                     break
                 if now - last_seen > (0.2 if repeating else 0.7):
                     break         # no repeats any more -> key released
-                # ramp 0 -> MAX_SPEED, then stay at MAX_SPEED while held
-                speed = round(MAX_SPEED * min(1.0, (now - pressed_at) / RAMP_TIME), 2)
+                held = now - pressed_at
+                if held < RAMP_TIME:
+                    # first ramp 0 -> MAX_SPEED
+                    speed = MAX_SPEED * held / RAMP_TIME
+                else:
+                    # then: reset to HOLD_MIN_SPEED, ramp to MAX_SPEED, repeat
+                    phase = ((held - RAMP_TIME) % HOLD_CYCLE) / HOLD_CYCLE
+                    speed = HOLD_MIN_SPEED + (MAX_SPEED - HOLD_MIN_SPEED) * phase
+                speed = round(speed, 2)
                 if speed != last_speed:
                     # Only touch the PWM when the speed actually changes; once at
                     # MAX_SPEED the PWM is left running instead of being re-set
