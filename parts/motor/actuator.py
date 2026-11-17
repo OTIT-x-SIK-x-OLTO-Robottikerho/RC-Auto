@@ -8,6 +8,8 @@ BACKWARD_PIN = 22
 PWM_FREQUENCY = 30  # Hz, gpiozero default is 100 Hz
 MAX_SPEED = 0.8     # keyboard control ramps up to this duty cycle (80 %)
 RAMP_TIME = 2.0     # seconds to go from 0 to MAX_SPEED while a key is held
+HOLD_MIN_SPEED = 0.75  # after the first ramp, cycle HOLD_MIN_SPEED -> MAX_SPEED
+HOLD_CYCLE = 0.5       # seconds per 75 % -> 80 % cycle
 
 
 def make_motor() -> Motor:
@@ -67,6 +69,7 @@ def keyboard_control():
             window.timeout(20)    # getch() waits at most 20 ms -> smooth ramp
             pressed_at = last_seen = time()
             repeating = False
+            last_speed = None
             while True:
                 k = window.getch()
                 now = time()
@@ -78,10 +81,23 @@ def keyboard_control():
                     break
                 if now - last_seen > (0.2 if repeating else 0.7):
                     break         # no repeats any more -> key released
-                speed = MAX_SPEED * min(1.0, (now - pressed_at) / RAMP_TIME)
-                motor.value = direction * speed
-                window.addstr(2, 0, f"{'forward ' if direction > 0 else 'backward'} {speed:4.0%}")
-                window.refresh()
+                held = now - pressed_at
+                if held < RAMP_TIME:
+                    # first ramp 0 -> MAX_SPEED
+                    speed = MAX_SPEED * held / RAMP_TIME
+                else:
+                    # then keep cycling HOLD_MIN_SPEED -> MAX_SPEED, reset, repeat
+                    phase = ((held - RAMP_TIME) % HOLD_CYCLE) / HOLD_CYCLE
+                    speed = HOLD_MIN_SPEED + (MAX_SPEED - HOLD_MIN_SPEED) * phase
+                speed = round(speed, 2)
+                if speed != last_speed:
+                    # Only touch the PWM when the speed actually changes; once at
+                    # MAX_SPEED the PWM is left running instead of being re-set
+                    # every 20 ms (re-setting can restart the PWM cycle).
+                    motor.value = direction * speed
+                    last_speed = speed
+                    window.addstr(2, 0, f"{'forward ' if direction > 0 else 'backward'} {speed:4.0%}")
+                    window.refresh()
             # KEY RELEASED
             window.timeout(-1)
             motor.stop()
