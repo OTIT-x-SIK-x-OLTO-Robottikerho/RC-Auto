@@ -5,7 +5,7 @@ from time import sleep, time
 ENABLE_PIN = 17
 FORWARD_PIN = 27
 BACKWARD_PIN = 22
-PWM_FREQUENCY = 1000  # Hz, gpiozero default is 100 Hz
+PWM_FREQUENCY = 128  # Hz, gpiozero default is 100 Hz
 
 
 def make_motor() -> Motor:
