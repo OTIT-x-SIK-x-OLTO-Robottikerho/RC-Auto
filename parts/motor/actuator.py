@@ -15,9 +15,9 @@ def spin_motor_forward_and_backwards():
     try:
         while time() < end_time:
             motor.forward()
-            sleep(1)
+            sleep(5)
             motor.backward()
-            sleep(1)
+            sleep(5)
     finally:
         motor.stop()
         motor.close()
