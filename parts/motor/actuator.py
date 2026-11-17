@@ -14,10 +14,12 @@ def spin_motor_forward_and_backwards():
     end_time = time() + 20 # run for 4 seconds
     try:
         while time() < end_time:
-            motor.forward()
-            sleep(5)
-            motor.backward()
-            sleep(5)
+            motor.forward(0.5)
+            print("forward")
+            sleep(3)
+            motor.backward(0.5)
+            print("backwards")
+            sleep(3)
     finally:
         motor.stop()
         motor.close()
