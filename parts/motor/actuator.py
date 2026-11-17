@@ -17,10 +17,10 @@ def spin_motor_forward_and_backwards():
             # direction switches immediately, no stop() in between
             motor.forward()
             print("forward")
-            sleep(5)
-            motor.backward()
-            print("backwards")
-            sleep(5)
+            sleep(20)
+           # motor.backward()
+            #print("backwards")
+            #sleep(5)
     finally:
         motor.stop()
         motor.close()
