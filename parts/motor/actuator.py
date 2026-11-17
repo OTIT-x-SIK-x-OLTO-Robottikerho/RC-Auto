@@ -1,26 +1,69 @@
-from gpiozero import Motor
+from gpiozero import DigitalOutputDevice, PWMOutputDevice
 from time import sleep, time
 
-# DRI0041 motor driver pins (BCM numbering)
-ENABLE_PIN = 17
-FORWARD_PIN = 27
-BACKWARD_PIN = 22
+# Motor driver pins, BCM numbering (what gpiozero uses).
+# NOTE: WiringPi/Pi4J diagrams use different numbers!
+PWM_PIN = 12        # speed pulse = WiringPi 26 = physical pin 32 (PWM0)
+FORWARD_PIN = 27    # direction IN1 = physical pin 13
+BACKWARD_PIN = 22   # direction IN2 = physical pin 15
 PWM_FREQUENCY = 30  # Hz, gpiozero default is 100 Hz
 MAX_SPEED = 0.8     # keyboard control ramps up to this duty cycle (80 %)
 RAMP_TIME = 1.0     # seconds to go from 0 to MAX_SPEED while a key is held
 
 
-def make_motor() -> Motor:
-    motor = Motor(forward=FORWARD_PIN, backward=BACKWARD_PIN, enable=ENABLE_PIN)
-    motor.forward_device.frequency = PWM_FREQUENCY
-    motor.backward_device.frequency = PWM_FREQUENCY
-    return motor
+class DriverMotor:
+    """IN1/IN2 set the direction, PWM on the pulse pin sets the speed."""
+
+    def __init__(self):
+        self.in1 = DigitalOutputDevice(FORWARD_PIN)
+        self.in2 = DigitalOutputDevice(BACKWARD_PIN)
+        self.pwm = PWMOutputDevice(PWM_PIN, frequency=PWM_FREQUENCY)
+
+    def forward(self, speed: float = 1.0) -> None:
+        self.in1.on()
+        self.in2.off()
+        self.pwm.value = speed
+
+    def backward(self, speed: float = 1.0) -> None:
+        self.in1.off()
+        self.in2.on()
+        self.pwm.value = speed
+
+    def stop(self) -> None:
+        self.pwm.value = 0
+        self.in1.off()
+        self.in2.off()
+
+    @property
+    def value(self) -> float:
+        """-1.0 (full backward) .. 1.0 (full forward), 0 = stopped."""
+        if self.in1.value and not self.in2.value:
+            return self.pwm.value
+        if self.in2.value and not self.in1.value:
+            return -self.pwm.value
+        return 0.0
+
+    @value.setter
+    def value(self, speed: float) -> None:
+        if speed > 0:
+            self.forward(speed)
+        elif speed < 0:
+            self.backward(-speed)
+        else:
+            self.stop()
+
+    def close(self) -> None:
+        self.stop()
+        for dev in (self.in1, self.in2, self.pwm):
+            dev.close()
+
+
+def make_motor() -> DriverMotor:
+    return DriverMotor()
 
 
 def spin_motor_forward_and_backwards():
-    # The Pi drives the DRI0041's inputs; the driver powers the motor.
-    # enable is held high, speed is set with PWM on the forward/backward pins.
-    motor: Motor = make_motor()
+    motor = make_motor()
     end_time = time() + 4  # run for 4 seconds
     try:
         while time() < end_time:
