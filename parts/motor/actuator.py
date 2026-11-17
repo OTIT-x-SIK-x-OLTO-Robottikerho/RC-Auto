@@ -31,8 +31,8 @@ def keyboard_control():
     motor = Motor(forward=FORWARD_PIN, backward=BACKWARD_PIN, enable=ENABLE_PIN)
 
     actions = {
-        ord("w"): motor.forward,
-        ord("s"): motor.backward,
+        ord("w"): motor.forward, ord("W"): motor.forward,
+        ord("s"): motor.backward, ord("S"): motor.backward,
     }
 
     def main(window):
@@ -45,19 +45,27 @@ def keyboard_control():
             else:
                 key = next_key
                 next_key = None
-            if key == ord("q"):
+            if key in (ord("q"), ord("Q")):
                 break
             if key != -1:
                 # KEY PRESSED
-                curses.halfdelay(3)
                 action = actions.get(key)
                 if action is not None:
                     action()
-                next_key = key
-                while next_key == key:  # key auto-repeat = still held
+                    window.addstr(1, 0, "forward " if action == motor.forward else "backward")
+                    window.refresh()
+                # The keyboard's auto-repeat keeps sending the key while it is
+                # held. The first repeat comes only after the repeat delay
+                # (up to ~0.6 s on the Pi desktop), later ones every ~30-50 ms.
+                curses.halfdelay(7)  # wait for the first repeat
+                next_key = window.getch()
+                curses.halfdelay(2)  # then for the following repeats
+                while next_key == key:  # still held
                     next_key = window.getch()
                 # KEY RELEASED
                 motor.stop()
+                window.addstr(1, 0, "stopped ")
+                window.refresh()
 
     try:
         curses.wrapper(main)
