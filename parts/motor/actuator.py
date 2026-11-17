@@ -46,7 +46,7 @@ def spin_motor_forward_and_backwards():
 def pulse_demo():
     motor = Motor(forward=FORWARD_PIN, backward=BACKWARD_PIN, enable=ENABLE_PIN)
     try:
-        pulse(motor, 0.5, 5)    # half speed forward for 5 s
+        pulse(motor, 1, 5)      # full speed forward for 5 s
         pulse(motor, 0, 0)      # ramp down to stop
     finally:
         motor.stop()
