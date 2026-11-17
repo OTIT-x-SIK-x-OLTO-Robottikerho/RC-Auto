@@ -1,17 +1,66 @@
-from gpiozero import Motor
-from time import sleep, time
+from gpiozero import DigitalOutputDevice, PWMOutputDevice
+from time import sleep
 
-# DRI0041 motor driver pins (BCM numbering)
-ENABLE_PIN = 17
-FORWARD_PIN = 27
-BACKWARD_PIN = 22
+# DFRobot DRI0042 motor driver pins (BCM numbering)
+ENA_PIN = 17  # speed (PWM)
+IN1_PIN = 27  # direction
+IN2_PIN = 22  # direction
 
 
-def pulse(motor: Motor, speed: float, duration: float, ramp: float = 0.5, steps: int = 20) -> None:
+class DriverMotor:
+    """One motor channel of the DRI0042, driven like DFRobot's example:
+    IN1/IN2 set the direction, PWM on ENA sets the speed."""
+
+    def __init__(self, in1=IN1_PIN, in2=IN2_PIN, ena=ENA_PIN):
+        self.in1 = DigitalOutputDevice(in1)
+        self.in2 = DigitalOutputDevice(in2)
+        # ~1 kHz, close to Arduino's analogWrite on pin 6
+        self.ena = PWMOutputDevice(ena, frequency=1000)
+
+    def forward(self, speed: float = 1.0) -> None:
+        """speed 0.0-1.0 (Arduino's analogWrite 0-255 divided by 255)."""
+        self.in1.on()
+        self.in2.off()
+        self.ena.value = speed
+
+    def backward(self, speed: float = 1.0) -> None:
+        self.in1.off()
+        self.in2.on()
+        self.ena.value = speed
+
+    def brake(self) -> None:
+        """IN1 = IN2 = LOW, like Motor1_Brake()."""
+        self.in1.off()
+        self.in2.off()
+
+    @property
+    def value(self) -> float:
+        """-1.0 (full backward) .. 1.0 (full forward), 0 = stopped."""
+        if self.in1.value and not self.in2.value:
+            return self.ena.value
+        if self.in2.value and not self.in1.value:
+            return -self.ena.value
+        return 0.0
+
+    @value.setter
+    def value(self, speed: float) -> None:
+        if speed > 0:
+            self.forward(speed)
+        elif speed < 0:
+            self.backward(-speed)
+        else:
+            self.brake()
+
+    def close(self) -> None:
+        self.brake()
+        for dev in (self.in1, self.in2, self.ena):
+            dev.close()
+
+
+def pulse(motor: DriverMotor, speed: float, duration: float, ramp: float = 0.5, steps: int = 20) -> None:
     """Run the motor at `speed` for `duration` seconds.
 
     speed: -1.0 (full backward) .. 1.0 (full forward), 0 = stopped.
-           Sets the PWM duty cycle on the forward/backward pin.
     ramp:  seconds to ramp from the current speed to `speed`. A soft start
            avoids the big inrush current that can trip the supply/driver.
     """
@@ -24,34 +73,25 @@ def pulse(motor: Motor, speed: float, duration: float, ramp: float = 0.5, steps:
     sleep(duration)
 
 
-def spin_motor_forward_and_backwards():
-    # The Pi drives the DRI0041's inputs; the driver powers the motor.
-    # enable is held high, speed is set with PWM on the forward/backward pins.
-    motor: Motor = Motor(forward=FORWARD_PIN, backward=BACKWARD_PIN, enable=ENABLE_PIN)
-    end_time = time() + 20  # run for 20 seconds (2 forward/backward cycles)
+def dfrobot_test():
+    """Python version of DFRobot's DRI0042_Test.ino loop (one motor)."""
+    motor = DriverMotor()
+    speed = 200 / 255  # analogWrite(ENA, 200)
     try:
-        while time() < end_time:
-            # direction switches immediately, no stop() in between
-            motor.forward()
-            print("forward")
-            sleep(20)
-           # motor.backward()
-            #print("backwards")
-            #sleep(5)
+        while True:
+            motor.brake()
+            sleep(0.1)
+            motor.forward(speed)
+            sleep(1)
+            motor.brake()
+            sleep(0.1)
+            motor.backward(speed)
+            sleep(1)
+    except KeyboardInterrupt:
+        pass
     finally:
-        motor.stop()
-        motor.close()
-
-
-def pulse_demo():
-    motor = Motor(forward=FORWARD_PIN, backward=BACKWARD_PIN, enable=ENABLE_PIN)
-    try:
-        pulse(motor, 1, 5)      # full speed forward for 5 s
-        pulse(motor, 0, 0)      # ramp down to stop
-    finally:
-        motor.stop()
         motor.close()
 
 
 if __name__ == "__main__":
-    pulse_demo()
+    dfrobot_test()
