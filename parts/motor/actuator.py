@@ -6,6 +6,8 @@ ENABLE_PIN = 17
 FORWARD_PIN = 27
 BACKWARD_PIN = 22
 PWM_FREQUENCY = 30  # Hz, gpiozero default is 100 Hz
+MAX_SPEED = 0.8     # keyboard control ramps up to this duty cycle (80 %)
+RAMP_TIME = 2.0     # seconds to go from 0 to MAX_SPEED while a key is held
 
 
 def make_motor() -> Motor:
@@ -38,13 +40,12 @@ def keyboard_control():
 
     motor = make_motor()
 
-    actions = {
-        ord("w"): motor.forward, ord("W"): motor.forward,
-        ord("s"): motor.backward, ord("S"): motor.backward,
-    }
+    # key -> direction (+1 forward, -1 backward)
+    directions = {ord("w"): 1, ord("W"): 1, ord("s"): -1, ord("S"): -1}
 
     def main(window):
         window.addstr("Hold w = forward, hold s = backward, q = quit\n")
+        window.addstr(f"Speed ramps 0 -> {MAX_SPEED:.0%} over {RAMP_TIME} s while held\n")
         next_key = None
         while True:
             curses.halfdelay(1)
@@ -55,25 +56,37 @@ def keyboard_control():
                 next_key = None
             if key in (ord("q"), ord("Q")):
                 break
-            if key != -1:
-                # KEY PRESSED
-                action = actions.get(key)
-                if action is not None:
-                    action()
-                    window.addstr(1, 0, "forward " if action == motor.forward else "backward")
-                    window.refresh()
-                # The keyboard's auto-repeat keeps sending the key while it is
-                # held. The first repeat comes only after the repeat delay
-                # (up to ~0.6 s on the Pi desktop), later ones every ~30-50 ms.
-                curses.halfdelay(7)  # wait for the first repeat
-                next_key = window.getch()
-                curses.halfdelay(2)  # then for the following repeats
-                while next_key == key:  # still held
-                    next_key = window.getch()
-                # KEY RELEASED
-                motor.stop()
-                window.addstr(1, 0, "stopped ")
+            direction = directions.get(key)
+            if direction is None:
+                continue
+            # KEY PRESSED: ramp the speed up for as long as the key is held.
+            # The keyboard's auto-repeat keeps sending the key while it is
+            # held. The first repeat comes only after the repeat delay
+            # (up to ~0.6 s on the Pi desktop), later ones every ~30-50 ms.
+            curses.cbreak()       # leave halfdelay mode so timeout() applies
+            window.timeout(20)    # getch() waits at most 20 ms -> smooth ramp
+            pressed_at = last_seen = time()
+            repeating = False
+            while True:
+                k = window.getch()
+                now = time()
+                if k == key:
+                    last_seen = now
+                    repeating = True
+                elif k != -1:     # another key pressed
+                    next_key = k
+                    break
+                if now - last_seen > (0.2 if repeating else 0.7):
+                    break         # no repeats any more -> key released
+                speed = MAX_SPEED * min(1.0, (now - pressed_at) / RAMP_TIME)
+                motor.value = direction * speed
+                window.addstr(2, 0, f"{'forward ' if direction > 0 else 'backward'} {speed:4.0%}")
                 window.refresh()
+            # KEY RELEASED
+            window.timeout(-1)
+            motor.stop()
+            window.addstr(2, 0, "stopped        ")
+            window.refresh()
 
     try:
         curses.wrapper(main)
