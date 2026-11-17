@@ -93,5 +93,15 @@ def dfrobot_test():
         motor.close()
 
 
+def forward_5s():
+    """Full speed forward for 5 seconds, then brake."""
+    motor = DriverMotor()
+    try:
+        motor.forward(1.0)
+        sleep(5)
+    finally:
+        motor.close()
+
+
 if __name__ == "__main__":
-    dfrobot_test()
+    forward_5s()
