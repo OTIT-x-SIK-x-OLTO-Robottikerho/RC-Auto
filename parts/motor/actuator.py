@@ -8,8 +8,6 @@ BACKWARD_PIN = 22
 PWM_FREQUENCY = 30  # Hz, gpiozero default is 100 Hz
 MAX_SPEED = 0.8     # keyboard control ramps up to this duty cycle (80 %)
 RAMP_TIME = 1.0     # seconds to go from 0 to MAX_SPEED while a key is held
-HOLD_MIN_SPEED = 0.75  # after the first ramp, cycle HOLD_MIN_SPEED -> MAX_SPEED
-HOLD_CYCLE = 0.5       # seconds per 75 % -> 80 % cycle
 
 
 def make_motor() -> Motor:
@@ -81,15 +79,8 @@ def keyboard_control():
                     break
                 if now - last_seen > (0.2 if repeating else 0.7):
                     break         # no repeats any more -> key released
-                held = now - pressed_at
-                if held < RAMP_TIME:
-                    # first ramp 0 -> MAX_SPEED
-                    speed = MAX_SPEED * held / RAMP_TIME
-                else:
-                    # then keep cycling HOLD_MIN_SPEED -> MAX_SPEED, reset, repeat
-                    phase = ((held - RAMP_TIME) % HOLD_CYCLE) / HOLD_CYCLE
-                    speed = HOLD_MIN_SPEED + (MAX_SPEED - HOLD_MIN_SPEED) * phase
-                speed = round(speed, 2)
+                # ramp 0 -> MAX_SPEED, then stay at MAX_SPEED while held
+                speed = round(MAX_SPEED * min(1.0, (now - pressed_at) / RAMP_TIME), 2)
                 if speed != last_speed:
                     # Only touch the PWM when the speed actually changes; once at
                     # MAX_SPEED the PWM is left running instead of being re-set
